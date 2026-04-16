@@ -2,9 +2,8 @@ package serhii.meshcheriakov.springlearn1;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 import serhii.meshcheriakov.springlearn1.model.Order;
 
 import java.util.List;
@@ -21,11 +20,21 @@ public class MyController {
 
     @GetMapping("/{id}")
     public Order getOrderById(@PathVariable("id") Long id) {
+        logger.info("getOrderById");
         return myService.getOrderById(id);
     }
 
     @GetMapping()
-    public List<Order> getAllOrders() {
-        return myService.getAllOrders();
+    public ResponseEntity<List<Order>> getAllOrders() {
+        logger.info("getAllOrders");
+        return ResponseEntity.ok(myService.getAllOrders());
+    }
+
+    @PostMapping
+    public ResponseEntity<Order> addOrder(@RequestBody Order newOrder) {
+        logger.info("addOrder");
+        return ResponseEntity.status(201)
+                .header("test-header", "123")
+                .body(myService.addOrder(newOrder));
     }
 }
