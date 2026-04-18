@@ -1,83 +1,84 @@
 package serhii.meshcheriakov.springlearn1;
 
-import org.jspecify.annotations.Nullable;
+import jakarta.persistence.EntityNotFoundException;
+import serhii.meshcheriakov.springlearn1.entity.OrderEntity;
 import serhii.meshcheriakov.springlearn1.model.Order;
 import org.springframework.stereotype.Service;
 import serhii.meshcheriakov.springlearn1.model.OrderStatus;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class MyService {
-    private final Map<Long, Order> orders;
-    private final AtomicLong idCounter;
+    private final MyRepository repository;
 
-    public MyService() {
-        orders = new HashMap<>();
-        idCounter = new AtomicLong();
+    public MyService(MyRepository repository) {
+        this.repository = repository;
     }
 
     public Order getOrderById(Long id) {
-        if (!orders.containsKey(id)) {
+        if (!repository.existsById(id)) {
             throw new NoSuchElementException("Order not found! Id = " + id);
-        } else {
-            return orders.get(id);
         }
+        var foundOrder = repository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Order not found! Id = " + id));
+        return toDomainOrder(foundOrder);
     }
 
     public List<Order> getAllOrders() {
-        return orders.values().stream().toList();
+        List<OrderEntity> allOrdersEntities = repository.findAll();
+
+        return allOrdersEntities.stream()
+                .map(this::toDomainOrder)
+                .toList();
     }
 
     public Order addOrder(Order newOrder) {
-        if (newOrder.id() != null) {
-            throw new IllegalArgumentException("Id should not be set!");
-        }
-        if (newOrder.status() != null) {
-            throw new IllegalArgumentException("Status should not be set!");
-        }
-        var order = new Order(
-          idCounter.incrementAndGet(),
+        var orderToCreate = new OrderEntity(
+                null,
                 newOrder.user_id(),
                 newOrder.product_id(),
                 newOrder.amount_to_be_paid(),
                 OrderStatus.IN_PROCESS
         );
-        orders.put(order.id(), order);
-        return order;
+        var savedOrder = repository.save(orderToCreate);
+        return toDomainOrder(savedOrder);
     }
 
     public void deleteOrder(Long id) {
-        if (!orders.containsKey(id)) {
+        if (!repository.existsById(id)) {
             throw new NoSuchElementException("Order not found! Id = " + id);
         }
-        var order = orders.get(id);
-        if (order.status() == OrderStatus.IN_TRANSIT) {
-            throw new IllegalArgumentException("Order status should not be IN_TRANSIT!");
-        }
-        orders.remove(id);
+        repository.deleteById(id);
     }
 
-    public Order updateOrder(Long id, Order updatedOrder) {
-        if (!orders.containsKey(id)) {
-            throw new NoSuchElementException("Order not found! Id = " + id);
-        }
-        var order = orders.get(id);
-        if (order.status() != OrderStatus.IN_PROCESS) {
+//    @param orderToUpdate
+//    is an Order type value which must be saved to DB
+    public Order updateOrder(Long id, Order orderToUpdate) {
+        var foundOrder = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Order not found! Id = " + id));
+        if (foundOrder.getStatus() != OrderStatus.IN_PROCESS) {
             throw new IllegalArgumentException("Order status should be IN_PROCESS!");
         }
-        var newOrder = new Order(
-                order.id(),
-                updatedOrder.user_id(),
-                updatedOrder.product_id(),
-                updatedOrder.amount_to_be_paid(),
+        OrderEntity orderToSave = new OrderEntity(
+                id,
+                orderToUpdate.user_id(),
+                orderToUpdate.product_id(),
+                orderToUpdate.amount_to_be_paid(),
                 OrderStatus.IN_PROCESS
         );
-        orders.put(id, newOrder);
-        return newOrder;
+        repository.save(orderToSave);
+        return toDomainOrder(orderToSave);
+    }
+
+    private Order toDomainOrder(OrderEntity foundOrder) {
+        return new Order(
+                foundOrder.getId(),
+                foundOrder.getUser_id(),
+                foundOrder.getProduct_id(),
+                foundOrder.getAmount_to_be_paid(),
+                foundOrder.getStatus()
+        );
     }
 }
